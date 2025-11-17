@@ -4,17 +4,15 @@ import time
 np.set_printoptions(linewidth=np.inf)
 np.set_printoptions(suppress=True)
 
-class convModel:
+images = idx2numpy.convert_from_file("train-images.idx3-ubyte")
+labels = idx2numpy.convert_from_file("train-labels.idx1-ubyte")  
+
+class Convolution:
     def __init__(self):
         pass
     
     def run(self):
-        images,labels = self.imageLoader()
-
-        train_images = images[:50000]
-        train_labels = labels[:50000]
-        validation_images = images[50000:]
-        validation_labels = labels[:50000]
+        train_images,_,validation_images,_ = self.imageLoader()
 
         filter_1,filter_2,filter_3 = self.getParameters()
         feature_map_1 = self.convolution_1(train_images,filter_1)
@@ -23,33 +21,35 @@ class convModel:
         pooled_feature_map_2 = self.pooling_2(feature_map_2)
         feature_map_3 = self.convolution_3(pooled_feature_map_2,filter_3)
         pooled_feature_map_3 = self.pooling_3(feature_map_3)
+        return pooled_feature_map_3
         
     def imageLoader(self):
         images = idx2numpy.convert_from_file("train-images.idx3-ubyte")
         labels = idx2numpy.convert_from_file("train-labels.idx1-ubyte")    
 
-        return images,labels
+        images = images/255
+
+        train_images = images[:50000]
+        train_labels = labels[:50000]
+        validation_images = images[50000:]
+        validation_labels = labels[:50000]
+
+        return train_images,train_labels,validation_images,validation_labels
 
     def getParameters(self):
         """Loading parameters"""
 
         #============Filter: Convolution 1============#
-        filter_1 = np.zeros((8,9))
-        for i in range(8):
-            filter_1[i,:] = np.arange(1,10)
-        filter_1 = filter_1.reshape((8,3,3))
+        
+        filter_1 = np.random.normal(loc=0,scale=np.sqrt((2/72)),size=(8,3,3))
 
         #============Filter: Convolution 2============#
-        filter_2 = np.zeros((16,9))
-        for i in range(16):
-            filter_2[i,:] = np.arange(1,10)
-        filter_2 = filter_2.reshape((16,3,3))
+
+        filter_2 = np.random.normal(loc=0,scale=np.sqrt((2/144)),size=(16,3,3))
 
         #============Filter: Convolution 3============#
-        filter_3 = np.zeros((32,9))
-        for i in range(32):
-            filter_3[i,:] = np.arange(1,10)
-        filter_3 = filter_3.reshape((32,3,3))
+
+        filter_3 = np.random.normal(loc=0,scale=np.sqrt((2/288)),size=(32,3,3))
 
         return filter_1,filter_2,filter_3
 
@@ -161,7 +161,271 @@ class convModel:
 
         return pooled_feature_map_3
     
+class MLP:
+    def __init__(self,model_conv,MLP_input):
+        self.convModel = model_conv
+        self.input = MLP_input
+        pass
+    
+    def Train(self,e,LR):
+        """Runs one full training epoch with a sample size of 50000 units.
+        Initialisation --> Front Propagation --> Back Propagation
+        Updates Parameters after each iteration"""
+        sample_number = 1
+        # Getting training input (32,4,4)
+        MLP_input = self.input
+        # Loading pretrained Parameters from File
+        parameters = self.getTrainingParameters(e) 
+        # Loading images and labels
+        train_images,train_labels,validation_images,validation_labels = self.convModel.imageLoader()
 
-model = convModel()
-model.run()
+        Aj_Epoch,OHE_Epoch,norm_grad,loss_epoch = self.getVariables(sample_number)  # Initilializing variables
+
+
+        # Loops front and back propagation
+        for sample in range(sample_number):
+            train_images_sample = MLP_input.reshape(512,1)  # Reshape from (32,4,4) to (512,1)
+
+            OHE,OHE_Epoch = self.getOneHotEncoding(train_labels,sample,OHE_Epoch)
+
+            Zk,Ak,Aj,loss,Aj_Epoch,loss_epoch = self.Forward(train_images_sample,parameters,OHE,sample,Aj_Epoch,loss_epoch) # One Forward Pass
+
+            parameters,norm_grad = self.Backward(Aj,Ak,OHE,parameters,Zk,train_images_sample,LR,norm_grad)  # One Backward Pass
+
+            print(loss)
+            print(parameters["Weight_k_i"].shape)
+            print(parameters["Bias_k"].shape)
+            print(parameters["Weight_j_k"].shape)
+            print(parameters["Bias_j"].shape)
+        return
+
+#======================================================================================================
+# 1. INITIALISATION
+#======================================================================================================    
+
+    def getTrainingParameters(self,e):
+        """Loads pre-trained model weights and biases from file."""
+        
+        #parameters = numpy.load(f"Test_3.1_LR0-005/parameters_T3.1/parameters_e{e-1}_T3.2.npz")
+        parameters = np.load(f"Convolution/initial_parameters_512.npz")
+        #parameters = numpy.load(f"initial_parameters.npz")
+        parameters_dict = {"Weight_k_i":parameters['wki'],               # weights: input -> hidden (64,784)
+                            "Bias_k":parameters['bk'].reshape(64,1),      # biases:  hidden (64,1)
+                            "Weight_j_k":parameters['wjk'],               # weights: hidden -> output (10,64)
+                            "Bias_j":parameters['bj'].reshape(10,1)}      # weights: output (10,1)
+
+        return parameters_dict
+    
+    def getVariables(self,sample_number):
+        """Initializing Variables required for plotting.
+        Aj_Epoch stores the model's predicted probability for all classes for every iteration,
+        OHE_Epoch stores the dataset's True Label for all classes for every iteration,
+        norm_grad stores the cumulative total for an epoch
+        loss_grad stores the cumulative total for an epoch
+        """
+
+        Aj_Epoch = np.zeros((sample_number,10))  # Activation Neuron in Output Layer (10000,10)
+        OHE_Epoch = np.zeros((sample_number,10)) # One Hot Encoding (10000,10)
+        norm_grad = 0  
+        loss_epoch = 0
+        
+        return Aj_Epoch,OHE_Epoch,norm_grad,loss_epoch
+
+    def getOneHotEncoding(self,labels,sample,OHE_Epoch):
+        """Prepares a binary 1 Dimensional array with 10 elements, where each index
+        represents its corresponding class. The class of current sample will index
+        a 1 for its corresponding index.
+        """
+        OHE = np.zeros((10,1),dtype=int)
+
+        # Indexing 1 to the index that corresponds to the current digit
+        # Returns a 2D array of size (10,1)
+        OHE[labels[sample]] = 1 
+
+        OHE_Epoch[sample] = OHE.T
+
+        return OHE,OHE_Epoch
+
+#======================================================================================================
+# 2. FORWARD PROPAGATION
+#======================================================================================================
+
+    def Forward(self,image_sample,parameters,OHE,sample,Aj_Epoch,loss_epoch): 
+        """Runs a forward pass for one sample."""
+        
+        Ak, Zk = self.Activation_k(image_sample,parameters)       # Calculates Activation Neurons in 2nd Layer
+        Aj,Aj_Epoch = self.Activation_j(Ak,parameters,sample,Aj_Epoch)   # Calculates Activation Neurons in Output Layer
+        loss,loss_epoch = self.CrossEntropyLoss(Aj,OHE,loss_epoch)       # Calculates Loss Value for entire network
+
+        return Zk,Ak,Aj,loss,Aj_Epoch,loss_epoch
+    
+    def ReLU(self,Zk):
+        """
+        Introduces non-linearity to network.
+
+        Takes all values of pre activation neurons:
+        if value is zero or negative, it will return a 0;
+        if value is positive, it will return itself
+        """
+
+        # Return a boolean array where values will return true if satisfy RHS of equation, or else it will return false
+        Zk_Boolean = Zk > 0 
+
+        #Will apply a mask on Zk, where all indices that are False(zero or negative) will return 0.
+        Zk = np.where(Zk_Boolean,Zk,0)
+
+        return Zk
+    
+    def Activation_k(self,image_sample,parameters):
+        """
+        Computes value of each 64 activation neurons in the 2nd layer of network in 64 element array.
+
+        Calculates the weighted sum of one pre-activation neuron in the 2nd layer,
+        stores it in Zk array with respective index, 
+        non-linearility is introduced by applying ReLU function on preactivation neurons
+        to compute activation neurons
+
+        Preactivation neurons in hidden layer (2nd layer) --> Zk
+        Activation neurons in hidden layer (2nd layer) --> Ak
+        """        
+
+        # Matrix Multiplication to calculate weighted sum (64,784)@(784,1)
+        # Matrix addition to calculate preactivation neuron (64,1) + (64,1)
+        image_sample = image_sample/np.max(image_sample)
+        Zk = (parameters["Weight_k_i"]@image_sample) 
+        Zk = Zk + parameters["Bias_k"]  
+
+        Ak = self.ReLU(Zk) # Applying ReLU function (64,1)
+
+        return Ak, Zk
+    
+    def SoftMax(self, Zj):
+        """
+        Applying SoftMax function to Activation Neurons in output layer.
+
+        Returns a 1 Dimensional array with 10 elements representing the model's
+        confidence for each class, in probability format, 
+        where each index represents its corresponding class
+        """
+        Zj_nominator = np.exp(Zj - np.max(Zj))   # Computing nominator 
+        Zj_denominator = np.sum(Zj_nominator)       # Computing denominator
+
+        Aj = Zj_nominator/Zj_denominator   # Calculates the probability for each possible class
+
+        return Aj
+        
+    def Activation_j(self,Ak,parameters,sample,Aj_Epoch):
+        """
+        Computes value of each 10 activation neurons in the output layer of network in a 10 element array.
+
+        Calculates the weighted sum of one pre-activation neuron in the output layer,
+        stores it in Zj array with respective index, 
+        Softmax function is applied to Zj to compute activation neurons ,
+        which returns model's confidence for each class in probability format
+     
+
+        Preactivation neurons in output layer (Final layer) --> Zj
+        Activation neurons in output layer (Final layer) --> Aj
+        """
+
+        # Matrix Multiplication to calculate weighted sum (10,64)@(64,1)
+        # Matrix addition to calculate preactivation neuron (10,1)+(10,1)
+        Zj = parameters["Weight_j_k"]@Ak
+        Zj = Zj + parameters["Bias_j"]
+        #Applying Temperature Scaling
+        # 
+        # Zj = Zj/1.94
+        Aj = self.SoftMax(Zj) # Applying Softmax function (10,1)
+        # Storing all Activating neurons (50000,10)
+        Aj_Epoch[sample] = Aj.T # (1,10)
+
+        return Aj,Aj_Epoch
+
+    def CrossEntropyLoss(self,Aj,OHE,loss_epoch):
+        """
+        Returns loss value for entire network for current sample, which is essentially the
+        negative natural log of the model's probability for the True class.
+        OHE is in binary format, so only the index of True Class has a value of 1.
+
+        Loss of Network = Sum(OHE[class] * Aj[class]),
+        which is the same as:
+        Loss of Network = 1 * Aj[True class]
+
+        """
+        loss = -np.log(Aj[np.where(OHE == 1)]) # Returns a 1D array of size (1,)
+        loss_epoch += loss
+
+        return loss[0],loss_epoch
+
+#======================================================================================================
+# 3. BACKWARD PROPAGATION
+#======================================================================================================    
+
+    def Backward(self,Aj,Ak,OHE,parameters,Zk,train_images_sample,LR,norm_grad):
+        """Runs a Backward Pass for one sample"""
+
+        gradients,norm_grad = self.getGradients(Aj,Ak,OHE,parameters,Zk,train_images_sample,norm_grad)  #Computes gradient values for all parameters
+    
+        updated_parameters = self.ParametersUpdate(parameters,gradients,LR) #Returns updated parameters
+
+        return updated_parameters,norm_grad
+    
+    def dReLU(self,Zk):
+        """Returns the derivatives of all Ak values w.r.t their respective Zk values"""
+
+        indices = Zk > 0    #Returns all indices where its values are positive as Boolean Type
+
+        Zk = np.where(indices,1,0)  #Applies index mask, where all True Values become 1, and all False values become 0
+
+        return Zk
+    
+    def getGradients(self,Aj,Ak,OHE,parameters,Zk,train_images_sample,norm_grad):
+        """Calculates gradients for all parameters.
+        Returns a dictionary of all 4 types of parameters, where each gradient value
+        represents the value of the same index"""
+        
+        dZ_j = Aj - OHE #Preactivation Neurons in Output Layer
+        dZ_k = ((parameters["Weight_j_k"].T)@dZ_j)*self.dReLU(Zk)   #Preactivation Neurons in Hidden Layer
+        
+
+        db_j = dZ_j #Biases in Output Layer
+        dW_jk = dZ_j@Ak.T   #Weights in Hidden Layer
+        
+        
+        db_k = dZ_k #Biases in Hidden Layer
+        dw_ki = dZ_k@train_images_sample.T  #Weights in Input Layer
+
+        gradients = {"Weight_k_i":dw_ki,
+                     "Bias_k":db_k,
+                     "Weight_j_k":dW_jk,
+                     "Bias_j":db_j}
+ 
+        # Calculating magnitude all gradients from each parameter for every sample
+        norm_grad += np.sqrt((np.sum(dW_jk**2)) + (np.sum(db_j**2)) + (np.sum(dw_ki**2)) + (np.sum(db_k**2)))
+
+        return gradients,norm_grad
+
+    def ParametersUpdate(self,parameters,gradients,LR):
+        """Updating parameters by taking the difference between its value and 
+        its gradient multiplied by factor (Learning Rate).
+        Storing the updated parameters in a dictionary."""
+
+        weight_k_i_updated = parameters["Weight_k_i"] - LR * gradients["Weight_k_i"]    #Weights in Input Layer
+        bias_k_updated = parameters["Bias_k"] - LR * gradients["Bias_k"]                #Biases in Hidden Layer
+
+        weight_j_k_updated = parameters["Weight_j_k"] - LR * gradients["Weight_j_k"]    #Weights in Hidden Layer Layer
+        bias_j_updated = parameters["Bias_j"] - LR * gradients["Bias_j"]                #Biases in Output Layer
+
+        updated_parameters = {"Weight_k_i":weight_k_i_updated,
+                              "Bias_k":bias_k_updated,
+                              "Weight_j_k":weight_j_k_updated,
+                              "Bias_j":bias_j_updated}
+
+        return updated_parameters
+        
+model_conv = Convolution()
+MLP_input = model_conv.run()
+model_MLP = MLP(model_conv,MLP_input)
+model_MLP.Train(e=1,LR=0.005)
+
 
