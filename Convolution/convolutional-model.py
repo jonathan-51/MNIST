@@ -11,10 +11,8 @@ class Convolution:
     def __init__(self):
         pass
     
-    def run(self):
-        train_images,_,validation_images,_ = self.imageLoader()
+    def Train(self,train_images,filter_1,filter_2,filter_3):
 
-        filter_1,filter_2,filter_3 = self.getParameters()
         feature_map_1 = self.convolution_1(train_images,filter_1)
         pooled_feature_map_1 = self.pooling_1(feature_map_1)
         feature_map_2 = self.convolution_2(pooled_feature_map_1,filter_2)
@@ -22,45 +20,17 @@ class Convolution:
         feature_map_3 = self.convolution_3(pooled_feature_map_2,filter_3)
         pooled_feature_map_3 = self.pooling_3(feature_map_3)
         return pooled_feature_map_3
-        
-    def imageLoader(self):
-        images = idx2numpy.convert_from_file("train-images.idx3-ubyte")
-        labels = idx2numpy.convert_from_file("train-labels.idx1-ubyte")    
 
-        images = images/255
+    def Validation(self):
+        _,_,val_images,_ = self.imageLoader()
 
-        train_images = images[:50000]
-        train_labels = labels[:50000]
-        validation_images = images[50000:]
-        validation_labels = labels[:50000]
-
-        return train_images,train_labels,validation_images,validation_labels
-
-    def getParameters(self):
-        """Loading parameters"""
-
-        #============Filter: Convolution 1============#
-        
-        filter_1 = np.random.normal(loc=0,scale=np.sqrt((2/72)),size=(8,3,3))
-
-        #============Filter: Convolution 2============#
-
-        filter_2 = np.random.normal(loc=0,scale=np.sqrt((2/144)),size=(16,3,3))
-
-        #============Filter: Convolution 3============#
-
-        filter_3 = np.random.normal(loc=0,scale=np.sqrt((2/288)),size=(32,3,3))
-
-        return filter_1,filter_2,filter_3
-
-    def convolution_1(self,train_images,filter):
+    def convolution_1(self,image,filter):
         """Handles the first convolution. 
         Passes the 28x28 image through 8 3x3 filters with a stride of 1.
         Padded the image to create a 30x30 image so that the final output after convolution would be a 28x28 image.
         Takes the sum of the 3x3 filter after each scan.
         Returns a (8,28,28) feature map.
         """
-        image = train_images[0]
         image = np.pad(image,1,mode='constant') # Adding padding to image, won't affect output as padding are zeros
         feature_map = np.zeros((8,28,28))
 
@@ -162,74 +132,28 @@ class Convolution:
         return pooled_feature_map_3
     
 class MLP:
-    def __init__(self,model_conv,MLP_input):
-        self.convModel = model_conv
-        self.input = MLP_input
+    def __init__(self):
+
         pass
     
-    def Train(self,e,LR):
+    def Train(self,MLP_input,sample,parameters,train_labels,Aj_Epoch,OHE_Epoch,loss_epoch):
         """Runs one full training epoch with a sample size of 50000 units.
         Initialisation --> Front Propagation --> Back Propagation
         Updates Parameters after each iteration"""
-        sample_number = 1
-        # Getting training input (32,4,4)
-        MLP_input = self.input
-        # Loading pretrained Parameters from File
-        parameters = self.getTrainingParameters(e) 
-        # Loading images and labels
-        train_images,train_labels,validation_images,validation_labels = self.convModel.imageLoader()
-
-        Aj_Epoch,OHE_Epoch,norm_grad,loss_epoch = self.getVariables(sample_number)  # Initilializing variables
-
 
         # Loops front and back propagation
-        for sample in range(sample_number):
-            train_images_sample = MLP_input.reshape(512,1)  # Reshape from (32,4,4) to (512,1)
 
-            OHE,OHE_Epoch = self.getOneHotEncoding(train_labels,sample,OHE_Epoch)
+        train_images_sample = MLP_input.reshape(512,1)  # Reshape from (32,4,4) to (512,1)
 
-            Zk,Ak,Aj,loss,Aj_Epoch,loss_epoch = self.Forward(train_images_sample,parameters,OHE,sample,Aj_Epoch,loss_epoch) # One Forward Pass
+        OHE,OHE_Epoch = self.getOneHotEncoding(train_labels,sample,OHE_Epoch)
 
-            parameters,norm_grad = self.Backward(Aj,Ak,OHE,parameters,Zk,train_images_sample,LR,norm_grad)  # One Backward Pass
+        Zk,Ak,Aj,loss,Aj_Epoch,loss_epoch = self.Forward(train_images_sample,parameters,OHE,sample,Aj_Epoch,loss_epoch) # One Forward Pass
 
-            print(loss)
-            print(parameters["Weight_k_i"].shape)
-            print(parameters["Bias_k"].shape)
-            print(parameters["Weight_j_k"].shape)
-            print(parameters["Bias_j"].shape)
-        return
+        return Zk,Ak,Aj,Aj_Epoch,loss_epoch,OHE
 
 #======================================================================================================
-# 1. INITIALISATION
+# INITIALISATION
 #======================================================================================================    
-
-    def getTrainingParameters(self,e):
-        """Loads pre-trained model weights and biases from file."""
-        
-        #parameters = numpy.load(f"Test_3.1_LR0-005/parameters_T3.1/parameters_e{e-1}_T3.2.npz")
-        parameters = np.load(f"Convolution/initial_parameters_512.npz")
-        #parameters = numpy.load(f"initial_parameters.npz")
-        parameters_dict = {"Weight_k_i":parameters['wki'],               # weights: input -> hidden (64,784)
-                            "Bias_k":parameters['bk'].reshape(64,1),      # biases:  hidden (64,1)
-                            "Weight_j_k":parameters['wjk'],               # weights: hidden -> output (10,64)
-                            "Bias_j":parameters['bj'].reshape(10,1)}      # weights: output (10,1)
-
-        return parameters_dict
-    
-    def getVariables(self,sample_number):
-        """Initializing Variables required for plotting.
-        Aj_Epoch stores the model's predicted probability for all classes for every iteration,
-        OHE_Epoch stores the dataset's True Label for all classes for every iteration,
-        norm_grad stores the cumulative total for an epoch
-        loss_grad stores the cumulative total for an epoch
-        """
-
-        Aj_Epoch = np.zeros((sample_number,10))  # Activation Neuron in Output Layer (10000,10)
-        OHE_Epoch = np.zeros((sample_number,10)) # One Hot Encoding (10000,10)
-        norm_grad = 0  
-        loss_epoch = 0
-        
-        return Aj_Epoch,OHE_Epoch,norm_grad,loss_epoch
 
     def getOneHotEncoding(self,labels,sample,OHE_Epoch):
         """Prepares a binary 1 Dimensional array with 10 elements, where each index
@@ -247,7 +171,7 @@ class MLP:
         return OHE,OHE_Epoch
 
 #======================================================================================================
-# 2. FORWARD PROPAGATION
+# FORWARD PROPAGATION
 #======================================================================================================
 
     def Forward(self,image_sample,parameters,OHE,sample,Aj_Epoch,loss_epoch): 
@@ -358,18 +282,24 @@ class MLP:
         return loss[0],loss_epoch
 
 #======================================================================================================
-# 3. BACKWARD PROPAGATION
+# BACKWARD PROPAGATION
 #======================================================================================================    
+class Backward:
+    def __init__(self):
+        pass
 
-    def Backward(self,Aj,Ak,OHE,parameters,Zk,train_images_sample,LR,norm_grad):
+    def Backward(self,Aj,Ak,OHE,parameters,Zk,MLP_input,LR,norm_grad):
         """Runs a Backward Pass for one sample"""
-
-        gradients,norm_grad = self.getGradients(Aj,Ak,OHE,parameters,Zk,train_images_sample,norm_grad)  #Computes gradient values for all parameters
+        MLP_input = MLP_input.reshape(512,1)  # Reshape from (32,4,4) to (512,1)
+        gradients,norm_grad = self.getGradientsMLP(Aj,Ak,OHE,parameters,Zk,MLP_input,norm_grad)  #Computes gradient values for all parameters
     
         updated_parameters = self.ParametersUpdate(parameters,gradients,LR) #Returns updated parameters
-
         return updated_parameters,norm_grad
     
+    def getGradientsConv(self):
+        
+        return
+
     def dReLU(self,Zk):
         """Returns the derivatives of all Ak values w.r.t their respective Zk values"""
 
@@ -379,7 +309,7 @@ class MLP:
 
         return Zk
     
-    def getGradients(self,Aj,Ak,OHE,parameters,Zk,train_images_sample,norm_grad):
+    def getGradientsMLP(self,Aj,Ak,OHE,parameters,Zk,MLP_input,norm_grad):
         """Calculates gradients for all parameters.
         Returns a dictionary of all 4 types of parameters, where each gradient value
         represents the value of the same index"""
@@ -393,7 +323,7 @@ class MLP:
         
         
         db_k = dZ_k #Biases in Hidden Layer
-        dw_ki = dZ_k@train_images_sample.T  #Weights in Input Layer
+        dw_ki = dZ_k@MLP_input.T  #Weights in Input Layer
 
         gradients = {"Weight_k_i":dw_ki,
                      "Bias_k":db_k,
@@ -422,10 +352,140 @@ class MLP:
                               "Bias_j":bias_j_updated}
 
         return updated_parameters
+
+#======================================================================================================
+# RUN
+#======================================================================================================   
+
+class Model:
+    def __init__(self,model_conv,model_MLP,model_Backward):
+        self.model_conv = model_conv
+        self.model_MLP = model_MLP
+        self.model_Backward = model_Backward
+        pass
+
+    def Run(self,e,LR):
+        sample_number = 1
+        train_images,train_labels,validation_images,validation_labels = self.imageLoader()
+        Aj_Epoch,OHE_Epoch,norm_grad,loss_epoch = self.getVariables(sample_number)  # Initilializing variables
+        filter_1,filter_2,filter_3 = self.getParameters()
+        parameters = self.getTrainingParameters(e) 
+
+        for sample in range(sample_number):
+            train_images_sample = train_images[sample]
+            MLP_input = self.model_conv.Train(train_images_sample,filter_1,filter_2,filter_3)
+            Zk,Ak,Aj,Aj_Epoch,loss_epoch,OHE = self.model_MLP.Train(MLP_input,sample,parameters,train_labels,Aj_Epoch,OHE_Epoch,loss_epoch)
+            updated_parameters,norm_grad = self.model_Backward.Backward(Aj,Ak,OHE,parameters,Zk,MLP_input,LR,norm_grad)
+            print(updated_parameters["Weight_k_i"].shape)
+            print(updated_parameters["Bias_k"].shape)
+            print(updated_parameters["Weight_j_k"].shape)
+            print(updated_parameters["Bias_j"].shape)
+        return
+    
+#======================================================================================================
+# INITIALISATION
+#======================================================================================================  
+
+    def imageLoader(self):
+        images = idx2numpy.convert_from_file("train-images.idx3-ubyte")
+        labels = idx2numpy.convert_from_file("train-labels.idx1-ubyte")    
+
+        images = images/255
+
+        train_images = images[:50000]
+        train_labels = labels[:50000]
+        validation_images = images[50000:]
+        validation_labels = labels[:50000]
+
+        return train_images,train_labels,validation_images,validation_labels
+
+    def getParameters(self):
+        """Loading parameters"""
+
+        #============Filter: Convolution 1============#
         
+        filter_1 = np.random.normal(loc=0,scale=np.sqrt((2/72)),size=(8,3,3))
+
+        #============Filter: Convolution 2============#
+
+        filter_2 = np.random.normal(loc=0,scale=np.sqrt((2/144)),size=(16,3,3))
+
+        #============Filter: Convolution 3============#
+
+        filter_3 = np.random.normal(loc=0,scale=np.sqrt((2/288)),size=(32,3,3))
+
+        return filter_1,filter_2,filter_3
+
+    def getTrainingParameters(self,e):
+        """Loads pre-trained model weights and biases from file."""
+        
+        #parameters = numpy.load(f"Test_3.1_LR0-005/parameters_T3.1/parameters_e{e-1}_T3.2.npz")
+        parameters = np.load(f"Convolution/initial_parameters_512.npz")
+        #parameters = numpy.load(f"initial_parameters.npz")
+        parameters_dict = {"Weight_k_i":parameters['wki'],               # weights: input -> hidden (64,784)
+                            "Bias_k":parameters['bk'].reshape(64,1),      # biases:  hidden (64,1)
+                            "Weight_j_k":parameters['wjk'],               # weights: hidden -> output (10,64)
+                            "Bias_j":parameters['bj'].reshape(10,1)}      # weights: output (10,1)
+
+        return parameters_dict
+    
+    def getVariables(self,sample_number):
+        """Initializing Variables required for plotting.
+        Aj_Epoch stores the model's predicted probability for all classes for every iteration,
+        OHE_Epoch stores the dataset's True Label for all classes for every iteration,
+        norm_grad stores the cumulative total for an epoch
+        loss_grad stores the cumulative total for an epoch
+        """
+
+        Aj_Epoch = np.zeros((sample_number,10))  # Activation Neuron in Output Layer (10000,10)
+        OHE_Epoch = np.zeros((sample_number,10)) # One Hot Encoding (10000,10)
+        norm_grad = 0  
+        loss_epoch = 0
+        
+        return Aj_Epoch,OHE_Epoch,norm_grad,loss_epoch
+
+    def getOneHotEncoding(self,labels,sample,OHE_Epoch):
+        """Prepares a binary 1 Dimensional array with 10 elements, where each index
+        represents its corresponding class. The class of current sample will index
+        a 1 for its corresponding index.
+        """
+        OHE = np.zeros((10,1),dtype=int)
+
+        # Indexing 1 to the index that corresponds to the current digit
+        # Returns a 2D array of size (10,1)
+        OHE[labels[sample]] = 1 
+
+        OHE_Epoch[sample] = OHE.T
+
+        return OHE,OHE_Epoch
+#======================================================================================================
+# 4. EVALUATION
+#======================================================================================================  
+class Evaluation:
+    def __init__(self,model):
+        self.model = model
+
+        pass
+
+    def getEpochStats(self):
+        """Aggregate all data required to log for epoch summary."""
+
+        train_loss_avg,val_loss_avg = self.getLoss()    # gets average loss for both training and validation for one epoch
+
+        train_acc,val_acc = self.getAccuracy()  #gets model's correct predictions for both training and validation
+
+        # gets model's training time and validation time for one epoc
+        train_time = self.model.traintime   
+        val_time = self.model.valtime
+
+        norm_grad_mean = self.model.normgrad    # gets normalized gradient for one epoch (Average magnitude of all parameters gradient from one iteration)
+
+        return train_loss_avg,val_loss_avg,train_acc,val_acc,train_time,val_time,norm_grad_mean
+
 model_conv = Convolution()
-MLP_input = model_conv.run()
-model_MLP = MLP(model_conv,MLP_input)
-model_MLP.Train(e=1,LR=0.005)
+model_MLP = MLP()
+model_Backward = Backward()
+model = Model(model_conv,model_MLP,model_Backward)
+model.Run(e=1,LR=0.005)
 
 
