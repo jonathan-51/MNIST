@@ -206,7 +206,14 @@ def norm_gradients(dw_FL_batch, db_FL_batch, db_FL_1_batch, dw_FL_1_batch):
 
 #Update parameters based on learning rate of 0.01 and gradients.
 def learning(bias_j,dbias_FL,bias_k,dbias_FL_1,weight_jk,dweight_FL,weight_ki,dweight_FL_1,lr):
-    
+    print(bias_j.shape)
+    print(dbias_FL.shape)
+    print(bias_k.shape)
+    print(dbias_FL_1.shape)
+    print(weight_jk.shape)
+    print(dweight_FL.shape)
+    print(weight_ki.shape)
+    print(dweight_FL_1.shape)
     #Updates biases in output layer
     bias_j_new = bias_j - lr*dbias_FL
     #Updates biases in hidden layer
@@ -489,8 +496,8 @@ def train_epoch(bias_j, bias_k, weight_jk, weight_ki,train_dataset,e,batch_num,v
             batch_end = time.time()
             
             #recording a batch's statistics into a csv file
-            with open("Test_1_LR0-01/training_report_T1.csv","a") as f:
-                f.write(f"\n{e},{batch},{lr},{loss_avg_batch},{probability_avg_batch}%,{accuracy_batch}%,{round((batch_end - batch_start),3)}s,{dweight_ki_norm},{dbias_k_norm},{dweight_jk_norm},{dbias_j_norm}")
+            # with open("Test_3_LR0-005/training_report_T3.csv","a") as f:
+            #     f.write(f"\n{e},{batch},{lr},{loss_avg_batch},{probability_avg_batch}%,{accuracy_batch}%,{round((batch_end - batch_start),3)}s,{dweight_ki_norm},{dbias_k_norm},{dweight_jk_norm},{dbias_j_norm}")
             
             #Reintialize the variables to prep for next batch
             probability_avg_batch,correct,loss_avg_batch,dw_FL_batch, db_FL_batch, db_FL_1_batch, dw_FL_1_batch = 0,0,0,0,0,0,0
@@ -518,8 +525,8 @@ def train_epoch(bias_j, bias_k, weight_jk, weight_ki,train_dataset,e,batch_num,v
             vcacc = numpy.round((val_class_total/val_labels_total)*100,2)
 
             time_train = time.time()
-            with open("Test_1_LR0-01/epoch_summary_T1.csv","a") as f:
-                f.write(f"\n{(e-1)+(val_e/5)},{round(loss_avg_epoch/(n+1),4)},{val_loss},{round(correct_total/(n+1)*100,2)}%,{val_acc}%,{train_max_probability_cumulative},{val_max_probability_cumulative},{round(time_train - start_time)}s,{val_time}s,{lr},{round(gradient_mean/(n+1),4)},{tcacc[0]},{tcacc[1]},{tcacc[2]},{tcacc[3]},{tcacc[4]},{tcacc[5]},{tcacc[6]},{tcacc[7]},{tcacc[8]},{tcacc[9]},{vcacc[0]},{vcacc[1]},{vcacc[2]},{vcacc[3]},{vcacc[4]},{vcacc[5]},{vcacc[6]},{vcacc[7]},{vcacc[8]},{vcacc[9]}")
+            # with open("Test_3_LR0-005/epoch_summary_T3.csv","a") as f:
+            #     f.write(f"\n{(e-1)+(val_e/5)},{round(loss_avg_epoch/(n+1),4)},{val_loss},{round(correct_total/(n+1)*100,2)}%,{val_acc}%,{train_max_probability_cumulative},{val_max_probability_cumulative},{round(time_train - start_time)}s,{val_time}s,{lr},{round(gradient_mean/(n+1),4)},{tcacc[0]},{tcacc[1]},{tcacc[2]},{tcacc[3]},{tcacc[4]},{tcacc[5]},{tcacc[6]},{tcacc[7]},{tcacc[8]},{tcacc[9]},{vcacc[0]},{vcacc[1]},{vcacc[2]},{vcacc[3]},{vcacc[4]},{vcacc[5]},{vcacc[6]},{vcacc[7]},{vcacc[8]},{vcacc[9]}")
     #val_e = 5, only for confusion matrix use.
     val_e += 1
 
@@ -541,7 +548,7 @@ def train_epoch(bias_j, bias_k, weight_jk, weight_ki,train_dataset,e,batch_num,v
     end_time = time.time()
 
     #Stores the most recent iteration's parameters into a npz file
-    numpy.savez(f"Test_1_LR0-01/epoch_{e}_parameters_T1.npz",wki = weight_ki, bk = bias_k, wjk = weight_jk, bj = bias_j)
+    # numpy.savez(f"Test_3_LR0-005/epoch_{e}_parameters_T3.npz",wki = weight_ki, bk = bias_k, wjk = weight_jk, bj = bias_j)
 
     #calculates the statistics for 1 epoch
     loss_avg_epoch,correct_total,time_epoch,gradient_mean = epoch_log_calc(n,loss_avg_epoch,correct_total,end_time,start_time,gradient_mean)
@@ -635,13 +642,13 @@ val_dataset = train_images_normalized[50000:60000,:]
 train_labels = train_labels_total[:50000]
 val_labels = train_labels_total[50000:60000]
 
-for e in range(11,16):
-
+for e in range(1,2):
+    
     #Sets number of iterations per batch
     batch_num = 1000
 
     #Learning Rate
-    lr = 0.01
+    lr = 0.005
 
     #Loads the stored parameters
     data = numpy.load(f"Test_1_LR0-01/epoch_{e-1}_parameters_T1.npz")
@@ -662,14 +669,14 @@ for e in range(11,16):
     vcacc = numpy.round((val_class_total/val_labels_total)*100,2)
 
     #Record statistics onto a csv file after each epoch
-    with open("Test_1_LR0-01/epoch_summary_T1.csv","a") as f:
-        f.write(f"\n{e:.1f},{train_loss},{val_loss},{train_acc}%,{val_acc}%,{train_max_prob_avg},{val_max_prob_avg},{train_time}s,{val_time}s,{lr},{gradient_mean},{tcacc[0]},{tcacc[1]},{tcacc[2]},{tcacc[3]},{tcacc[4]},{tcacc[5]},{tcacc[6]},{tcacc[7]},{tcacc[8]},{tcacc[9]},{vcacc[0]},{vcacc[1]},{vcacc[2]},{vcacc[3]},{vcacc[4]},{vcacc[5]},{vcacc[6]},{vcacc[7]},{vcacc[8]},{vcacc[9]}")
+    # with open("Test_3_LR0-005/epoch_summary_T3.csv","a") as f:
+    #     f.write(f"\n{e:.1f},{train_loss},{val_loss},{train_acc}%,{val_acc}%,{train_max_prob_avg},{val_max_prob_avg},{train_time}s,{val_time}s,{lr},{gradient_mean},{tcacc[0]},{tcacc[1]},{tcacc[2]},{tcacc[3]},{tcacc[4]},{tcacc[5]},{tcacc[6]},{tcacc[7]},{tcacc[8]},{tcacc[9]},{vcacc[0]},{vcacc[1]},{vcacc[2]},{vcacc[3]},{vcacc[4]},{vcacc[5]},{vcacc[6]},{vcacc[7]},{vcacc[8]},{vcacc[9]}")
 
-    with open("Test_1_LR0-01/CC_T_T1.csv", "a") as f:
-            f.write(f"\n{e},{T_avg_pp_bin[0]},{T_avg_pp_bin[1]},{T_avg_pp_bin[2]},{T_avg_pp_bin[3]},{T_avg_pp_bin[4]},{T_avg_pp_bin[5]},{T_avg_pp_bin[6]},{T_avg_pp_bin[7]},{T_avg_pp_bin[8]},{T_avg_pp_bin[9]},{T_acc_bin[0]},{T_acc_bin[1]},{T_acc_bin[2]},{T_acc_bin[3]},{T_acc_bin[4]},{T_acc_bin[5]},{T_acc_bin[6]},{T_acc_bin[7]},{T_acc_bin[8]},{T_acc_bin[9]}")
+    # with open("Test_3_LR0-005/CC_T_T3.csv", "a") as f:
+    #         f.write(f"\n{e},{T_avg_pp_bin[0]},{T_avg_pp_bin[1]},{T_avg_pp_bin[2]},{T_avg_pp_bin[3]},{T_avg_pp_bin[4]},{T_avg_pp_bin[5]},{T_avg_pp_bin[6]},{T_avg_pp_bin[7]},{T_avg_pp_bin[8]},{T_avg_pp_bin[9]},{T_acc_bin[0]},{T_acc_bin[1]},{T_acc_bin[2]},{T_acc_bin[3]},{T_acc_bin[4]},{T_acc_bin[5]},{T_acc_bin[6]},{T_acc_bin[7]},{T_acc_bin[8]},{T_acc_bin[9]}")
 
-    with open("Test_1_LR0-01/CC_V_T1.csv", "a") as f:
-            f.write(f"\n{e},{V_avg_pp_bin[0]},{V_avg_pp_bin[1]},{V_avg_pp_bin[2]},{V_avg_pp_bin[3]},{V_avg_pp_bin[4]},{V_avg_pp_bin[5]},{V_avg_pp_bin[6]},{V_avg_pp_bin[7]},{V_avg_pp_bin[8]},{V_avg_pp_bin[9]},{V_acc_bin[0]},{V_acc_bin[1]},{V_acc_bin[2]},{V_acc_bin[3]},{V_acc_bin[4]},{V_acc_bin[5]},{V_acc_bin[6]},{V_acc_bin[7]},{V_acc_bin[8]},{V_acc_bin[9]}")
+    # with open("Test_3_LR0-005/CC_V_T3.csv", "a") as f:
+    #         f.write(f"\n{e},{V_avg_pp_bin[0]},{V_avg_pp_bin[1]},{V_avg_pp_bin[2]},{V_avg_pp_bin[3]},{V_avg_pp_bin[4]},{V_avg_pp_bin[5]},{V_avg_pp_bin[6]},{V_avg_pp_bin[7]},{V_avg_pp_bin[8]},{V_avg_pp_bin[9]},{V_acc_bin[0]},{V_acc_bin[1]},{V_acc_bin[2]},{V_acc_bin[3]},{V_acc_bin[4]},{V_acc_bin[5]},{V_acc_bin[6]},{V_acc_bin[7]},{V_acc_bin[8]},{V_acc_bin[9]}")
 
-    #Saves the 2 confusion matrix from training and validation dataset into a single npz file
-    numpy.savez(f"Test_1_LR0-01/CM_E{e}_T1.npz",train = confusion_matrix_train, val = confusion_matrix_val)
+    # #Saves the 2 confusion matrix from training and validation dataset into a single npz file
+    # numpy.savez(f"Test_3_LR0-005/CM_E{e}_T3.npz",train = confusion_matrix_train, val = confusion_matrix_val)

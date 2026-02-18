@@ -118,8 +118,9 @@ class Model:
     def getTrainingParameters(self,e):
         """Loads pre-trained model weights and biases from file."""
        
-        parameters = numpy.load(f"Test_5.1_LR0-0001/parameters_T5.1/parameters_e{e-1}_T5.1.npz")
-
+        #parameters = numpy.load(f"Test_3.1_LR0-005/parameters_T3.1/parameters_e{e-1}_T3.2.npz")
+        parameters = numpy.load(f"Test_3.1_LR0-005/parameters_T3.1/parameters_e16_T3.1.npz")
+        #parameters = numpy.load(f"initial_parameters.npz")
         parameters_dict = {"Weight_k_i":parameters['wki'],               # weights: input -> hidden (64,784)
                            "Bias_k":parameters['bk'].reshape(64,1),      # biases:  hidden (64,1)
                            "Weight_j_k":parameters['wjk'],               # weights: hidden -> output (10,64)
@@ -164,7 +165,7 @@ class Model:
     def Forward(self,image_sample,parameters,OHE,sample,Aj_Epoch,loss_epoch): 
         """Runs a forward pass for one sample."""
         
-        Ak, Zk = self.Activation_k(image_sample,parameters,sample)       # Calculates Activation Neurons in 2nd Layer
+        Ak, Zk = self.Activation_k(image_sample,parameters)       # Calculates Activation Neurons in 2nd Layer
         Aj,Aj_Epoch = self.Activation_j(Ak,parameters,sample,Aj_Epoch)   # Calculates Activation Neurons in Output Layer
         loss,loss_epoch = self.CrossEntropyLoss(Aj,OHE,loss_epoch)       # Calculates Loss Value for entire network
 
@@ -187,7 +188,7 @@ class Model:
 
         return Zk
     
-    def Activation_k(self,image_sample,parameters,sample):
+    def Activation_k(self,image_sample,parameters):
         """
         Computes value of each 64 activation neurons in the 2nd layer of network in 64 element array.
 
@@ -244,6 +245,9 @@ class Model:
         Zj = parameters["Weight_j_k"]@Ak
         Zj = Zj + parameters["Bias_j"]
 
+        #Applying Temperature Scaling
+        # 
+        # Zj = Zj/1.94
         Aj = self.SoftMax(Zj) # Applying Softmax function (10,1)
 
         # Storing all Activating neurons (50000,10)
@@ -320,15 +324,6 @@ class Model:
         """Updating parameters by taking the difference between its value and 
         its gradient multiplied by factor (Learning Rate).
         Storing the updated parameters in a dictionary."""
-
-        # print(parameters["Weight_k_i"].shape)
-        # print(gradients["Weight_k_i"].shape)
-        # print(parameters["Bias_k"].shape)
-        # print(gradients["Bias_k"].shape)
-        # print(parameters["Weight_j_k"].shape)
-        # print(gradients["Weight_j_k"].shape)
-        # print(parameters["Bias_j"].shape)
-        # print(gradients["Bias_j"].shape)
 
         weight_k_i_updated = parameters["Weight_k_i"] - LR * gradients["Weight_k_i"]    #Weights in Input Layer
         bias_k_updated = parameters["Bias_k"] - LR * gradients["Bias_k"]                #Biases in Hidden Layer
@@ -460,6 +455,11 @@ class Evaluation:
         predicted_accuracy = numpy.divide(pred_prob_bin , total_bin, out=numpy.zeros_like(pred_prob_bin) , where = total_bin != 0)  #Computes the average predicted accuracy for each bin
         true_accuracy = numpy.divide(correct_bin , total_bin, out=numpy.zeros_like(correct_bin) , where = total_bin != 0)           #Computes the average true accuracy for each bin
 
+        weighted = total_bin/9999 #number of samples in each bin divided by the total number of samples
+        difference = numpy.abs(predicted_accuracy-true_accuracy)
+        ECE = weighted@difference.T
+        print(f"Calibrated: {ECE[0,0]}")
+        print(total_bin)
         return predicted_accuracy, true_accuracy
     
     def getConfusionMatrix(self):
@@ -478,6 +478,7 @@ class Evaluation:
         numpy.add.at(conf_matrix,(i_t,i_p),1) 
         return conf_matrix
 
+
 #======================================================================================================
 # 5. LOGGING
 #======================================================================================================    
@@ -495,7 +496,7 @@ class Logging:
         wjk = hidden layer weights
         bj = output layer biases"""
 
-        numpy.savez(f"Test_5.1_LR0-0001/parameters_T5.1/parameters_e{e}_T5.1.npz",wki = updated_parameters['Weight_k_i'], bk = updated_parameters['Bias_k'], wjk = updated_parameters['Weight_j_k'], bj = updated_parameters['Bias_j'])
+        numpy.savez(f"Test_3.2_LR0-005/parameters_T3.2/parameters_e{e}_T3.2.npz",wki = updated_parameters['Weight_k_i'], bk = updated_parameters['Bias_k'], wjk = updated_parameters['Weight_j_k'], bj = updated_parameters['Bias_j'])
 
         return
 
@@ -506,7 +507,7 @@ class Logging:
 
         train_loss,val_loss,train_acc,val_acc,train_time,val_time,norm_grad_mean= self.evaluation.getEpochStats()
 
-        with open("Test_5.1_LR0-0001/epoch_summary_T5.1.csv","a") as f:
+        with open("Test_3.2_LR0-005/epoch_summary_T3.2.csv","a") as f:
             f.write(f"\n{epoch},{LR},{train_loss:.4f},{val_loss:.4f},{train_acc:.2f},{val_acc:.2f},{train_time:.0f},{val_time:.0f},{norm_grad_mean:.3f}")
 
         return
@@ -518,7 +519,7 @@ class Logging:
         predicted_accuracy, true_accuracy = self.evaluation.getCalibration()
         
         #Writing Epoch Number to CSV File
-        with open("Test_5.1_LR0-0001/CC_V_T5.1.csv", "a") as f:
+        with open("Test_3.2_LR0-005/CC_V_T3.2.csv", "a") as f:
             f.write(f"\n{e}")
 
             # Writes Model's predicted probability for each bin
@@ -537,7 +538,7 @@ class Logging:
 
         conf_matrx = self.evaluation.getConfusionMatrix()
 
-        numpy.savez(f"Test_5.1_LR0-0001/CM_T5.1/CM_e{e}_T5.1.npz",confusion_matrx = conf_matrx)
+        numpy.savez(f"Test_3.2_LR0-005/CM_T3.2/CM_e{e}_T3.2.npz",confusion_matrx = conf_matrx)
 
         return
 
@@ -732,6 +733,207 @@ class LearnRateFinder:
 
         return
 
+class TemperatureScaling:
+    def __init__(self,model):
+        self.model = model
+        pass
+    
+    def Run(self,images,labels):
+        #getting validation dataset
+        val_images,val_labels = self.model.getValidationDataset(images,labels)
+
+        #Loading Parameters 50
+        parameters = self.getParameters()
+        
+        #Initialising
+        Zj_Epoch,Aj_Epoch,Zy_Epoch,OHE_Epoch,loss_epoch = self.Initialisation(val_images)
+
+        #Loops front propagation
+        for sample in range(len(val_images)):
+
+            val_image_sample = val_images[sample].reshape(784,1)   # Reshape from (784,) to (784,1)
+
+            OHE,OHE_Epoch = self.model.getOneHotEncoding(val_labels,sample,OHE_Epoch)
+            Zj_Epoch,Aj_Epoch,Zy_Epoch,loss_epoch = self.Forward(val_image_sample,parameters,OHE,sample,Aj_Epoch,loss_epoch,Zj_Epoch,Zy_Epoch)
+   
+        temperature_scalar = 1
+        loss_avg = loss_epoch/len(val_images)
+        with open("TempScalar_Optimizer.csv","a") as f:
+            f.write(f"\n{temperature_scalar:.2f},{loss_avg[0]:.4f}")
+
+        temperature_scalar_diff = 1
+
+        while temperature_scalar_diff > 1e-5:
+            temperature_scalar,Zj_Epoch,Aj_Epoch,Zy_Epoch,temperature_scalar_diff = self.Optimizer(temperature_scalar,Zj_Epoch,Aj_Epoch,Zy_Epoch,val_images,val_labels)
+    
+    def getParameters(self):
+        parameters_all = numpy.load("Test_3.1_LR0-005/parameters_T3.1/parameters_e50_T3.1.npz")
+
+        parameters = {"Weight_k_i":parameters_all['wki'],               # weights: input -> hidden (64,784)
+                      "Bias_k":parameters_all['bk'].reshape(64,1),      # biases:  hidden (64,1)
+                      "Weight_j_k":parameters_all['wjk'],               # weights: hidden -> output (10,64)
+                      "Bias_j":parameters_all['bj'].reshape(10,1)}      # weights: output (10,1)
+        return parameters
+    
+    def Initialisation(self,images):
+        #initialising array to store all logits in the final layer
+        Zj_Epoch = numpy.zeros((len(images),10)) 
+        #intialising array to store all predicted probabilities
+        Aj_Epoch = numpy.zeros((len(images),10))
+        #initialising variable to store the sum of all correct logits in the final layer
+        Zy_Epoch = 0
+        loss_epoch = 0
+        OHE_Epoch = numpy.zeros((len(images),10))
+
+        return Zj_Epoch,Aj_Epoch,Zy_Epoch,OHE_Epoch,loss_epoch
+    
+    def Forward(self,image_sample,parameters,OHE,sample,Aj_Epoch,loss_epoch,Zj_Epoch,Zy_Epoch): 
+        """Runs a forward pass for one sample."""
+        
+        Ak = self.Activation_k(image_sample,parameters)       # Calculates Activation Neurons in 2nd Layer
+        Aj,Aj_Epoch,Zj_Epoch = self.Activation_j(Ak,parameters,sample,Aj_Epoch,Zj_Epoch)   # Calculates Activation Neurons in Output Layer
+        loss_epoch,Zy_Epoch = self.CrossEntropyLoss(Aj,OHE,loss_epoch,Zy_Epoch)       # Calculates Loss Value for entire network
+
+        return Zj_Epoch,Aj_Epoch,Zy_Epoch,loss_epoch
+    
+    def ReLU(self,Zk):
+        """
+        Introduces non-linearity to network.
+
+        Takes all values of pre activation neurons:
+        if value is zero or negative, it will return a 0;
+        if value is positive, it will return itself
+        """
+
+        # Return a boolean array where values will return true if satisfy RHS of equation, or else it will return false
+        Zk_Boolean = Zk > 0 
+
+        #Will apply a mask on Zk, where all indices that are False(zero or negative) will return 0.
+        Zk = numpy.where(Zk_Boolean,Zk,0)
+
+        return Zk
+    
+    def Activation_k(self,image_sample,parameters):
+        """
+        Computes value of each 64 activation neurons in the 2nd layer of network in 64 element array.
+
+        Calculates the weighted sum of one pre-activation neuron in the 2nd layer,
+        stores it in Zk array with respective index, 
+        non-linearility is introduced by applying ReLU function on preactivation neurons
+        to compute activation neurons
+
+        Preactivation neurons in hidden layer (2nd layer) --> Zk
+        Activation neurons in hidden layer (2nd layer) --> Ak
+        """        
+
+        # Matrix Multiplication to calculate weighted sum (64,784)@(784,1)
+        # Matrix addition to calculate preactivation neuron (64,1) + (64,1)
+        Zk = (parameters["Weight_k_i"]@image_sample) 
+
+        Zk = Zk + parameters["Bias_k"]  
+
+        Ak = self.ReLU(Zk) # Applying ReLU function (64,1)
+
+        return Ak
+    
+    def SoftMax(self, Zj_Epoch):
+        """
+        Applying SoftMax function to Activation Neurons in output layer.
+
+        Returns a 1 Dimensional array with 10 elements representing the model's
+        confidence for each class, in probability format, 
+        where each index represents its corresponding class
+        """
+        max = (numpy.max(Zj_Epoch,axis=1)).reshape(10000,1)
+        Zj_nominator = numpy.exp(Zj_Epoch - max)   # Computing nominator 
+
+        Zj_denominator = (numpy.sum(Zj_nominator,axis=1)).reshape(10000,1)       # Computing denominator
+       
+ 
+        Aj_Epoch = Zj_nominator/Zj_denominator   # Calculates the probability for each possible class
+    
+        return Aj_Epoch
+        
+    def Activation_j(self,Ak,parameters,sample,Aj_Epoch,Zj_Epoch):
+        """
+        Computes value of each 10 activation neurons in the output layer of network in a 10 element array.
+
+        Calculates the weighted sum of one pre-activation neuron in the output layer,
+        stores it in Zj array with respective index, 
+        Softmax function is applied to Zj to compute activation neurons ,
+        which returns model's confidence for each class in probability format
+     
+
+        Preactivation neurons in output layer (Final layer) --> Zj
+        Activation neurons in output layer (Final layer) --> Aj
+        """
+
+        # Matrix Multiplication to calculate weighted sum (10,64)@(64,1)
+        # Matrix addition to calculate preactivation neuron (10,1)+(10,1)
+        Zj = parameters["Weight_j_k"]@Ak
+        Zj = Zj + parameters["Bias_j"]
+
+        Zj_Epoch[sample] =  Zj.T #(1,10)
+        
+        Aj = self.model.SoftMax(Zj) # Applying Softmax function (10,1)
+
+        Aj_Epoch[sample] = Aj.T # (1,10)
+
+        return Aj,Aj_Epoch,Zj_Epoch
+
+    def CrossEntropyLoss(self,Aj,OHE,loss_epoch,Zy_Epoch):
+        """
+        Returns loss value for entire network for current sample, which is essentially the
+        negative natural log of the model's probability for the True class.
+        OHE is in binary format, so only the index of True Class has a value of 1.
+
+        Loss of Network = Sum(OHE[class] * Aj[class]),
+        which is the same as:
+        Loss of Network = 1 * Aj[True class]
+
+        """
+        loss = -numpy.log(Aj[numpy.where(OHE == 1)]) # Returns a 1D array of size (1,)
+
+        loss_epoch += loss
+        Zy_Epoch += Aj[numpy.where(OHE == 1)]
+        return loss_epoch,Zy_Epoch
+
+    def Optimizer(self,temperature_scalar,Zj_Epoch,Aj_Epoch,Zy_Epoch,val_images,val_labels):
+        loss_epoch_updated = numpy.zeros((len(val_images),1))
+
+        print(f"Zy_Epoch: {Zy_Epoch.shape}")
+        print(f"Zj_Epoch: {Zj_Epoch.shape}")
+        print(f"Aj_Epoch: {Aj_Epoch.shape}")
+        # calculating averages
+        Zj_avg = (numpy.mean(Zj_Epoch,axis=0)).reshape(1,10) # (10,)
+        Aj_avg = (numpy.mean(Aj_Epoch,axis=0)).reshape(10,1) # (10,)
+        Zy_avg = (Zy_Epoch/len(val_images)).reshape(1,1)    # (1,)
+
+        #Calculate Temperature Scalar
+        dT = (1/temperature_scalar**2)*(Zy_avg - Zj_avg@Aj_avg)
+
+        temperature_scalar_updated = temperature_scalar + dT
+        #Update Logits
+
+        Zy_avg_updated = (Zy_avg/temperature_scalar_updated).reshape(1)
+        Zj_Epoch_updated = Zj_Epoch/temperature_scalar_updated
+        
+        #Calculate new probabilities
+        Aj_epoch_updated = self.SoftMax(Zj_Epoch_updated)
+        
+        #getting indices for number of rows in dataset 0 - 9999
+        indices = numpy.arange(0,10000)
+        #calculate new loss
+    
+        loss_epoch_updated = Aj_epoch_updated[indices,val_labels]
+        loss_avg = numpy.sum(-numpy.log(loss_epoch_updated))/len(val_images)
+
+        temperature_scalar_diff = numpy.abs(temperature_scalar-temperature_scalar_updated)
+
+        with open("TempScalar_Optimizer.csv","a") as f:
+            f.write(f"\n{temperature_scalar_updated[0,0]:.2f},{loss_avg:.4f}")
+        
+        return temperature_scalar_updated,Zj_Epoch_updated,Aj_epoch_updated,Zy_avg_updated,temperature_scalar_diff
 #============================================================================================================================================================================================================
 #============================================================================================================================================================================================================
 #============================================================================================================================================================================================================
@@ -743,16 +945,21 @@ Test = Model(images,labels,train_sample,val_sample)
 Results = Evaluation(Test)
 Recording = Logging(Test,Results)
 Learning = LearnRateFinder(Test,Results,Recording)
+TempScalar = TemperatureScaling(Test)
+LR = 0.005
 
-LR = 0.0001
-
-for epoch in range(2,51):
-
-    updated_parameters = Test.train(images,labels,LR,epoch)    
-    Recording.savingParameters(updated_parameters,epoch)
-    Test.val(images,labels,updated_parameters)
-    Recording.EpochSummary(epoch,LR)
-    Recording.CalibrationCurve(epoch)
-    Recording.ConfusionMatrix(epoch)
+# for epoch in range(16,17):
+    
+#     # updated_parameters = Test.train(images,labels,LR,epoch)    
+#     #Recording.savingParameters(updated_parameters,epoch)
+#     updated_parameters = Test.getTrainingParameters(epoch)
+#     Test.val(images,labels,updated_parameters)
+#     Results.getCalibration()
+#     # Recording.EpochSummary(epoch,LR)
+#     # Recording.CalibrationCurve(epoch)
+#     #Recording.ConfusionMatrix(epoch)
 
 # Learning.Learn(images,labels)
+
+# TempScalar.Run(images,labels)
+

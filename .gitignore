@@ -1,0 +1,34 @@
+# MNIST Dataset files
+*.idx3-ubyte
+*.idx1-ubyte
+
+# Model weights and parameters
+*.npz
+
+# Generated training outputs
+Test_*/
+LR_Optimizer.csv
+TempScalar_Optimizer.csv
+Test_Summary.csv
+
+# Repurposed experiment outputs
+Repurposed/
+
+# Generated images and stats
+*.png
+Stats/
+
+# Convolution experiments (incomplete)
+Convolution/
+
+# Deployment (empty)
+Deployment/
+
+# Scratch/temp files
+testt.py
+testt copy.py
+
+# Python
+__pycache__/
+*.pyc
+.venv/
