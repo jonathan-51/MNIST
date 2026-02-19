@@ -12,6 +12,7 @@ A from-scratch 2-layer MLP trained on the MNIST handwritten digit dataset, built
 | `MINST.py` | Original implementation, kept as reference |
 | `MINST.test.py` | Inference on the held-out test set |
 | `graphing.py` | Plots loss, accuracy, calibration curves, and confusion matrices |
+| `Convolution/` | Convolutional model — incomplete |
 
 ## Requirements
 

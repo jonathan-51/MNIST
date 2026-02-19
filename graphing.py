@@ -1,3 +1,4 @@
+import os
 import numpy
 import matplotlib.pyplot as plt
 import idx2numpy
@@ -660,8 +661,8 @@ class Test:
 # Loss_Compare(epoch_summary_T1_1, epoch_summary_T2_1,epoch_summary_T3_1)
 #lr_finder()
 
-plot = Validation()
-plot_compare = betweenTest()
+# plot = Validation()
+# plot_compare = betweenTest()
 # plot.Test_005()
 # plot.Test_001()
 # plot.Test_01()
@@ -669,5 +670,192 @@ plot_compare = betweenTest()
 # plot_compare.calibration_lr_0_005()
 # plot_compare.plotting_compare()
 
-test = Test()
-test.Plot()
+# test = Test()
+# test.Plot()
+
+class Report:
+    def __init__(self):
+        os.makedirs("Statistics", exist_ok=True)
+        self.tests = [
+            {"lr": 0.01,    "folder": "Test_1.1_LR0-01",    "epoch_csv": "epoch_summary_T1.1.csv", "cc_csv": "CC_V_T1.1.csv", "cm_folder": "CM_T1.1"},
+            {"lr": 0.001,   "folder": "Test_2.1_LR0-001",   "epoch_csv": "epoch_summary_T2.1.csv", "cc_csv": "CC_V_T2.1.csv", "cm_folder": "CM_T2.1"},
+            {"lr": 0.005,   "folder": "Test_3.1_LR0-005",   "epoch_csv": "epoch_summary_T3.1.csv", "cc_csv": "CC_V_T3.1.csv", "cm_folder": "CM_T3.1"},
+            {"lr": 0.00005, "folder": "Test_4.1_LR0-00005", "epoch_csv": "epoch_summary_T4.1.csv", "cc_csv": "CC_V_T4.1.csv", "cm_folder": "CM_T4.1"},
+            {"lr": 0.0001,  "folder": "Test_5.1_LR0-0001",  "epoch_csv": "epoch_summary_T5.1.csv", "cc_csv": "CC_V_T5.1.csv", "cm_folder": "CM_T5.1"},
+        ]
+
+    def run(self):
+        self.training_validation_per_test()
+        self.calibration_per_test()
+        self.confusion_matrix_per_test()
+        self.cross_lr_comparison()
+        self.test_results()
+        print("All plots saved to Statistics/")
+
+    def training_validation_per_test(self):
+        """Per learning rate: loss, accuracy, and gradient norm over epochs."""
+        for test in self.tests:
+            path = f"{test['folder']}/{test['epoch_csv']}"
+            if not os.path.exists(path):
+                continue
+            df = pd.read_csv(path)
+            epoch = df['Epoch']
+
+            fig, axes = plt.subplots(1, 3, figsize=(15, 4))
+            fig.suptitle(f"Training & Validation — LR {test['lr']}", size=14)
+
+            axes[0].plot(epoch, df['Train Loss'], label='Train', color='blue')
+            axes[0].plot(epoch, df['Val Loss'],   label='Val',   color='green')
+            axes[0].set_title("Loss vs Epoch")
+            axes[0].set_xlabel("Epoch")
+            axes[0].set_ylabel("Loss")
+            axes[0].legend()
+            axes[0].grid(True)
+
+            axes[1].plot(epoch, df['Train Acc'], label='Train', color='blue')
+            axes[1].plot(epoch, df['Val Acc'],   label='Val',   color='green')
+            axes[1].set_title("Accuracy vs Epoch")
+            axes[1].set_xlabel("Epoch")
+            axes[1].set_ylabel("Accuracy (%)")
+            axes[1].legend()
+            axes[1].grid(True)
+
+            axes[2].plot(epoch, df['Grad Norm'], color='red')
+            axes[2].set_title("Gradient Norm vs Epoch")
+            axes[2].set_xlabel("Epoch")
+            axes[2].set_ylabel("Gradient Norm")
+            axes[2].grid(True)
+
+            plt.tight_layout()
+            plt.savefig(f"Statistics/TrainVal_LR{test['lr']}.png", dpi=150, bbox_inches='tight')
+            plt.close()
+
+    def calibration_per_test(self):
+        """Per learning rate: calibration curve averaged across all epochs."""
+        for test in self.tests:
+            path = f"{test['folder']}/{test['cc_csv']}"
+            if not os.path.exists(path):
+                continue
+            CC = pd.read_csv(path)
+
+            val_pp      = pd.Series(numpy.zeros(10))
+            val_acc_bin = pd.Series(numpy.zeros(10))
+
+            for b in range(1, 9):
+                val_pp[b]      = CC[f'PP0.{b}-0.{b+1}'].mean()
+                val_acc_bin[b] = CC[f'A0.{b}-0.{b+1}'].mean()
+            val_pp[9]      = CC['PP0.9-1.0'].mean()
+            val_acc_bin[9] = CC['A0.9-1.0'].mean()
+
+            fig, ax = plt.subplots(figsize=(6, 5))
+            fig.suptitle(f"Calibration Curve (avg across epochs) — LR {test['lr']}", size=12)
+            x = numpy.linspace(0, 100, 11)
+            ax.plot(val_acc_bin * 100, val_pp * 100, color='brown', label='Model')
+            ax.plot(x, x, color='black', linestyle='--', label='Perfect calibration')
+            ax.set_xlabel("True Accuracy per Bin (%)")
+            ax.set_ylabel("Predicted Probability per Bin (%)")
+            ax.legend()
+            ax.grid(True)
+
+            plt.tight_layout()
+            plt.savefig(f"Statistics/Calibration_LR{test['lr']}.png", dpi=150, bbox_inches='tight')
+            plt.close()
+
+    def confusion_matrix_per_test(self):
+        """Per learning rate: confusion matrix at the final saved epoch, as percentages."""
+        for test in self.tests:
+            cm_dir = f"{test['folder']}/{test['cm_folder']}"
+            if not os.path.exists(cm_dir):
+                continue
+            cm_files = sorted(
+                [f for f in os.listdir(cm_dir) if f.endswith('.npz')],
+                key=lambda f: int(''.join(filter(str.isdigit, f)))
+            )
+            if not cm_files:
+                continue
+
+            data   = numpy.load(f"{cm_dir}/{cm_files[-1]}")
+            matrix = data['confusion_matrx']
+            matrix_pct = (matrix / matrix.sum(axis=1, keepdims=True)) * 100
+
+            fig, ax = plt.subplots(figsize=(7, 6))
+            fig.suptitle(f"Confusion Matrix ({cm_files[-1]}) — LR {test['lr']}", size=12)
+            sns.heatmap(matrix_pct, annot=True, fmt='.1f', cmap='Blues', ax=ax,
+                        cbar_kws={'label': '% of True Label'}, annot_kws={'size': 8})
+            ax.set_xlabel("Predicted Label")
+            ax.set_ylabel("True Label")
+
+            plt.tight_layout()
+            plt.savefig(f"Statistics/ConfusionMatrix_LR{test['lr']}.png", dpi=150, bbox_inches='tight')
+            plt.close()
+
+    def cross_lr_comparison(self):
+        """All 5 learning rates on one figure: train/val loss and accuracy."""
+        colors = ['green', 'red', 'orange', 'blue', 'black']
+        fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+        fig.suptitle("Training & Validation Comparison Across Learning Rates", size=14)
+
+        for test, color in zip(self.tests, colors):
+            path = f"{test['folder']}/{test['epoch_csv']}"
+            if not os.path.exists(path):
+                continue
+            df    = pd.read_csv(path)
+            epoch = df['Epoch']
+            lr    = str(test['lr'])
+
+            axes[0, 0].plot(epoch, df['Train Loss'], label=lr, color=color)
+            axes[0, 1].plot(epoch, df['Val Loss'],   label=lr, color=color)
+            axes[1, 0].plot(epoch, df['Train Acc'],  label=lr, color=color)
+            axes[1, 1].plot(epoch, df['Val Acc'],    label=lr, color=color)
+
+        for ax, (title, ylabel) in zip(axes.flat, [
+            ("Training Loss",     "Loss"),
+            ("Validation Loss",   "Loss"),
+            ("Training Accuracy", "Accuracy (%)"),
+            ("Validation Accuracy","Accuracy (%)"),
+        ]):
+            ax.set_title(title)
+            ax.set_xlabel("Epoch")
+            ax.set_ylabel(ylabel)
+            ax.legend()
+            ax.grid(True)
+
+        plt.tight_layout()
+        plt.savefig("Statistics/Comparison_All_LR.png", dpi=150, bbox_inches='tight')
+        plt.close()
+
+    def test_results(self):
+        """Test set performance (loss, accuracy, ECE) across all 50 saved epoch parameters."""
+        path = "Test_Summary.csv"
+        if not os.path.exists(path):
+            return
+        df    = pd.read_csv(path)
+        epoch = df['Epoch']
+
+        fig, axes = plt.subplots(1, 3, figsize=(13, 4))
+        fig.suptitle("Test Set Results Across Saved Epoch Parameters (LR 0.005)", size=13)
+
+        axes[0].plot(epoch, df['Loss'],     color='blue')
+        axes[0].set_title("Test Loss")
+        axes[0].set_xlabel("Epoch Parameters")
+        axes[0].set_ylabel("Loss")
+        axes[0].grid(True)
+
+        axes[1].plot(epoch, df['Accuracy'], color='green')
+        axes[1].set_title("Test Accuracy")
+        axes[1].set_xlabel("Epoch Parameters")
+        axes[1].set_ylabel("Accuracy (%)")
+        axes[1].grid(True)
+
+        axes[2].plot(epoch, df['ECE'],      color='red')
+        axes[2].set_title("ECE (Expected Calibration Error)")
+        axes[2].set_xlabel("Epoch Parameters")
+        axes[2].set_ylabel("ECE")
+        axes[2].grid(True)
+
+        plt.tight_layout()
+        plt.savefig("Statistics/Test_Results.png", dpi=150, bbox_inches='tight')
+        plt.close()
+
+report = Report()
+report.run()

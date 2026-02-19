@@ -16,6 +16,7 @@ Repurposed/
 
 # Generated images and stats
 *.png
+!Statistics/**/*.png
 Stats/
 
 # Convolution experiments (incomplete)
