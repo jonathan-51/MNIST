@@ -22,9 +22,6 @@ Stats/
 # Convolution experiments (incomplete)
 Convolution/
 
-# Deployment (empty)
-Deployment/
-
 # Scratch/temp files
 testt.py
 testt copy.py

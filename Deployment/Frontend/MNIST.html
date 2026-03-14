@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="stylesheet" href="/static/MNIST.css">
+</head>
+
+<body>
+    <div class="main">
+
+        <!-- Prediction & confidence display -->
+        <div class="results">
+                <div id="prediction">Prediction: --</div>
+                <div id="confidence">Confidence: --</div>
+        </div>
+
+        <!-- Drawing canvas -->
+        <canvas id="canvas" width="560" height="560"></canvas>
+
+        <!-- Buttons -->
+        <div class="functions">
+            <div id="predict">
+                <div class="fill"></div>
+                <span>Predict</span>
+            </div>
+            <div id="reset">Reset</div>
+        </div>
+    </div>
+
+    <!-- Per-class probabilities -->
+    <div id="probabilities">
+            <div id="num0">0: --</div>
+            <div id="num1">1: --</div>
+            <div id="num2">2: --</div>
+            <div id="num3">3: --</div>
+            <div id="num4">4: --</div>
+            <div id="num5">5: --</div>
+            <div id="num6">6: --</div>
+            <div id="num7">7: --</div>
+            <div id="num8">8: --</div>
+            <div id="num9">9: --</div>
+
+    </div>
+    <script src="/static/MNIST.js"></script>
+</body>
+
+</html>

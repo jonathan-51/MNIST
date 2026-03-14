@@ -1,0 +1,158 @@
+
+/* Page */
+
+body {
+    display:flex;
+    justify-content: center;
+    align-items: center;
+    margin: 0%;
+    height: 100vh;
+    background-color: #171717;
+
+}
+
+/* Layout */
+
+.main {
+    display:flex;
+    flex-direction:column ;
+    justify-content: center;
+    align-items: center;
+    width: 560px;
+    height:100%;}
+
+/* Results display */
+
+.results {
+    font-family: "Segoe UI Rounded", "Segoe UI", sans-serif;
+    font-size: 23px;
+    padding-bottom: 1%;
+    height:auto;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    color:aliceblue;
+}
+
+
+#prediction {
+    height: 100%;
+}
+
+#confidence {
+    height: 100%;
+
+}
+
+#probabilities {
+    font-family: "Segoe UI Rounded", "Segoe UI", sans-serif;
+    font-size: 22px;
+    color:rgb(255, 255, 255);
+    display: flex;
+    justify-content: space-between;
+    flex-direction: column;
+    padding-left: 0.5%;
+}
+
+#probabilities > * {
+    margin-top:27px;
+    border-bottom:1px solid white
+}
+
+/* Canvas */
+
+#canvas {
+    max-width: 560px;
+    max-height: 560px;
+    background-color: #000000;
+    cursor:crosshair;
+    touch-action: none; }
+
+/* Buttons */
+
+.functions {
+    font-size: 20px;
+    font-family: "Segoe UI Rounded", "Segoe UI", sans-serif;
+    font-weight: 700;
+    color: aliceblue;
+    user-select: none;
+    padding-top: 1%;
+    display:flex;
+    justify-content: space-between;
+    width: 100%;
+    height:40px;
+    margin:0;}
+
+/* Predict button */
+
+#predict {
+    position:relative;
+    border:2px solid #171717;
+    border-radius: 5%;
+    display:flex;
+    justify-content: center;
+    align-items: center;
+    width:20%;
+    height:100%;
+    background-color: #0f0f0f;}
+
+#predict:hover {
+    border:2px solid #ffffff;
+    border-radius: 5%;
+    cursor:pointer;}
+
+#predict:active{
+    background-color: hsl(0, 1%, 13%);}
+
+.predict-disabled {
+    pointer-events: none;
+    opacity: 0.5;
+    cursor: not-allowed;  }
+
+/* Predict button fill animation */
+
+@keyframes fillup {
+    from {width:0%}
+    to {width:100%}
+}
+
+.fill {
+    position:absolute;
+    height: 100%;
+    width: 0%;
+    left:0;
+    bottom:0;
+    background-color: rgb(37, 37, 37);
+}
+
+.fill.active {
+    animation: fillup 3s linear;
+    z-index: 0;
+}
+
+#predict span {
+    z-index: 1;
+}
+
+/* Reset button */
+
+#reset {
+    border:2px solid #171717;
+    border-radius: 5%;
+    display:flex;
+    justify-content: center;
+    align-items: center;
+    width:20%;
+    height:100%;
+    background-color: #0f0f0f;}
+
+#reset:hover {
+    border:2px solid #ffffff;
+    border-radius: 5%;
+    cursor:pointer;
+}
+#reset:active{
+    background-color: hsl(0, 1%, 13%);
+}
